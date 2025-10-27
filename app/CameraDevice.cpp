@@ -10043,21 +10043,23 @@ void CameraDevice::speed_test_gpio_only()
         // auto t1 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         // log("  " + std::to_string(t1) + "ms: GPIO press (set HIGH)\n");
         gpio_trigger_press();
+        std::this_thread::sleep_for(milliseconds(20));
+        gpio_trigger_release();
 
         // Hold shutter delay
         // auto t2 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         // log("  " + std::to_string(t2) + "ms: Hold delay (50ms)\n");
-        std::this_thread::sleep_for(milliseconds(100));
+        std::this_thread::sleep_for(milliseconds(200));
 
         // GPIO trigger release
         // auto t3 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         // log("  " + std::to_string(t3) + "ms: GPIO release (set LOW)\n");
-        gpio_trigger_release();
+        
 
         // Wait for image save
         // auto t4 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         // log("  " + std::to_string(t4) + "ms: Save wait delay (100ms)\n");
-        std::this_thread::sleep_for(milliseconds(100));
+        //std::this_thread::sleep_for(milliseconds(100));
 
         // auto after_cycle = high_resolution_clock::now();
         // auto cycle_time = duration_cast<milliseconds>(after_cycle - photo_start).count();
