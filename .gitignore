@@ -1,0 +1,33 @@
+# Build directories
+build/
+bin/
+obj/
+
+# Compiled binaries
+*.o
+*.dll
+*.exe
+RemoteCli
+
+# Exception: Keep external dependencies
+!external/**/*.so
+!external/**/*.so.*
+!external/**/*.dylib
+
+# Log files
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
