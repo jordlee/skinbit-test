@@ -9818,12 +9818,11 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
     log("Setting drive mode to Single Shot...\n");
     bool drive_mode_set = set_drive_mode(SDK::CrDriveMode::CrDrive_Single);
     if (!drive_mode_set) {
-        log("ERROR: Failed to set drive mode to Single Shot.\n");
-        log_file.close();
-        cleanup_gpio();
-        return;
+        log("WARNING: Failed to set drive mode (may already be set). Continuing...\n");
+    } else {
+        log("Drive mode set to Single Shot.\n");
     }
-    log("Drive mode set to Single Shot.\n\n");
+    log("\n");
 
     std::this_thread::sleep_for(milliseconds(500));
 
