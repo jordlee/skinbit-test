@@ -10048,6 +10048,9 @@ void CameraDevice::speed_test_gpio_only()
         // GPIO trigger release
         gpio_trigger_release();
 
+        //wait for image save
+        std::this_thread::sleep_for(milliseconds(100));
+
         auto after_release = high_resolution_clock::now();
         auto cycle_time = duration_cast<milliseconds>(after_release - photo_start).count();
 
