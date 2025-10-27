@@ -91,6 +91,8 @@ CameraDevice::CameraDevice(std::int32_t no, SCRSDK::ICrCameraObjectInfo const* c
     , m_conn_type(ConnectionType::UNKNOWN)
     , m_prop()
     , m_gpio_initialized(false)
+    , m_gpio_chip(nullptr)
+    , m_gpio_line(nullptr)
     , m_lvEnbSet(true)
     , m_modeSDK(SCRSDK::CrSdkControlMode_Remote)
     , m_spontaneous_disconnection(false)
@@ -9666,32 +9668,37 @@ bool CameraDevice::init_gpio()
         return true;
     }
 
-    tout << "Initializing GPIO " << GPIO_CHIP << " pin " << GPIO_TRIGGER_PIN << " (physical pin 32)...\n";
+    tout << "Initializing GPIO " << GPIO_CHIP << " pin " << GPIO_TRIGGER_PIN << " (physical pin 32) using libgpiod...\n";
 
-    // Test if gpioset command is available
-    std::string test_cmd = "which gpioset > /dev/null 2>&1";
-    int result = std::system(test_cmd.c_str());
-    if (result != 0) {
-        tout << "ERROR: gpioset command not found.\n";
-        tout << "Install libgpiod: sudo apt-get install gpiod\n";
+    // Open GPIO chip
+    m_gpio_chip = gpiod_chip_open_by_name(GPIO_CHIP);
+    if (!m_gpio_chip) {
+        tout << "ERROR: Failed to open GPIO chip " << GPIO_CHIP << "\n";
+        tout << "Make sure libgpiod is installed: sudo apt-get install libgpiod-dev\n";
         return false;
     }
 
-    // Initialize pin to LOW
-    gpio_trigger_release();
+    // Get GPIO line
+    m_gpio_line = gpiod_chip_get_line(m_gpio_chip, GPIO_TRIGGER_PIN);
+    if (!m_gpio_line) {
+        tout << "ERROR: Failed to get GPIO line " << GPIO_TRIGGER_PIN << "\n";
+        gpiod_chip_close(m_gpio_chip);
+        m_gpio_chip = nullptr;
+        return false;
+    }
 
-    // Verify we can control the pin
-    std::string verify_cmd = "gpioget " + std::string(GPIO_CHIP) + " " + std::to_string(GPIO_TRIGGER_PIN) + " > /dev/null 2>&1";
-    result = std::system(verify_cmd.c_str());
-    if (result != 0) {
-        tout << "ERROR: Cannot access GPIO pin.\n";
-        tout << "Command: gpioget " << GPIO_CHIP << " " << GPIO_TRIGGER_PIN << "\n";
+    // Request line as output, initially LOW
+    int ret = gpiod_line_request_output(m_gpio_line, "RemoteCli", 0);
+    if (ret < 0) {
+        tout << "ERROR: Failed to request GPIO line as output\n";
+        gpiod_chip_close(m_gpio_chip);
+        m_gpio_chip = nullptr;
+        m_gpio_line = nullptr;
         return false;
     }
 
     m_gpio_initialized = true;
-    tout << "GPIO pin " << GPIO_TRIGGER_PIN << " initialized successfully.\n";
-    tout << "Using commands: gpioset " << GPIO_CHIP << " " << GPIO_TRIGGER_PIN << "=0/1\n";
+    tout << "GPIO pin " << GPIO_TRIGGER_PIN << " initialized successfully using libgpiod C API.\n";
     return true;
 }
 
@@ -9704,7 +9711,16 @@ void CameraDevice::cleanup_gpio()
     tout << "Cleaning up GPIO pin " << GPIO_TRIGGER_PIN << "...\n";
 
     // Set pin to LOW before cleanup
-    gpio_trigger_release();
+    if (m_gpio_line) {
+        gpiod_line_set_value(m_gpio_line, 0);
+        gpiod_line_release(m_gpio_line);
+        m_gpio_line = nullptr;
+    }
+
+    if (m_gpio_chip) {
+        gpiod_chip_close(m_gpio_chip);
+        m_gpio_chip = nullptr;
+    }
 
     m_gpio_initialized = false;
     tout << "GPIO cleanup complete.\n";
@@ -9712,21 +9728,18 @@ void CameraDevice::cleanup_gpio()
 
 void CameraDevice::gpio_trigger_press()
 {
-    // Set GPIO HIGH (shutter press) using mode=time with long duration
-    // This keeps the pin high until we call release
-    std::string cmd = "timeout 5 gpioset --mode=time --sec=5 " + std::string(GPIO_CHIP) +
-                      " " + std::to_string(GPIO_TRIGGER_PIN) + "=1 &";
-    std::system(cmd.c_str());
-    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Let command start
+    // Set GPIO HIGH (shutter press) - direct call, <1ms overhead
+    if (m_gpio_line) {
+        gpiod_line_set_value(m_gpio_line, 1);
+    }
 }
 
 void CameraDevice::gpio_trigger_release()
 {
-    // Kill any running gpioset and set to LOW
-    std::system("pkill -9 gpioset 2>/dev/null");
-    std::string cmd = "gpioset --mode=time --usec=100000 " + std::string(GPIO_CHIP) +
-                      " " + std::to_string(GPIO_TRIGGER_PIN) + "=0";
-    std::system(cmd.c_str());
+    // Set GPIO LOW (shutter release) - direct call, <1ms overhead
+    if (m_gpio_line) {
+        gpiod_line_set_value(m_gpio_line, 0);
+    }
 }
 
 // ============================================================================

@@ -10,6 +10,9 @@ typedef int errno_t;
 #define  __STDC_WANT_LIB_EXT1__ 1
 #endif
 
+// Include libgpiod for direct GPIO control
+#include <gpiod.h>
+
 // End Linux definitions
 #endif
 
@@ -334,6 +337,8 @@ private:
     static constexpr int GPIO_TRIGGER_PIN = 12;  // Physical pin 32, GPIO 12 on gpiochip4
     static constexpr const char* GPIO_CHIP = "gpiochip4";
     bool m_gpio_initialized;
+    struct gpiod_chip* m_gpio_chip;
+    struct gpiod_line* m_gpio_line;
     bool m_lvEnbSet;
     SCRSDK::CrSdkControlMode m_modeSDK;
     MtpFolderList   m_foldList;

@@ -111,7 +111,10 @@ if(UNIX AND NOT APPLE)
         endif()
     endif()
 
-    target_link_libraries(${remotecli} PRIVATE 
+    # Link libgpiod for GPIO control on Raspberry Pi
+    target_link_libraries(${remotecli} PRIVATE gpiod)
+
+    target_link_libraries(${remotecli} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/external/opencv/Linux/libopencv_core.so.408
         ${CMAKE_CURRENT_SOURCE_DIR}/external/opencv/Linux/libopencv_highgui.so.408
         ${CMAKE_CURRENT_SOURCE_DIR}/external/opencv/Linux/libopencv_imgcodecs.so.408
