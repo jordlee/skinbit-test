@@ -91,8 +91,10 @@ CameraDevice::CameraDevice(std::int32_t no, SCRSDK::ICrCameraObjectInfo const* c
     , m_conn_type(ConnectionType::UNKNOWN)
     , m_prop()
     , m_gpio_initialized(false)
+#if defined(__linux__)
     , m_gpio_chip(nullptr)
     , m_gpio_line(nullptr)
+#endif
     , m_lvEnbSet(true)
     , m_modeSDK(SCRSDK::CrSdkControlMode_Remote)
     , m_spontaneous_disconnection(false)
@@ -9661,8 +9663,13 @@ void CameraDevice::set_ptzf_preset()
 // GPIO Control Functions for Raspberry Pi Hardware Trigger
 // ============================================================================
 
+#if defined(__linux__)
+#include <gpiod.h>
+#endif
+
 bool CameraDevice::init_gpio()
 {
+#if defined(__linux__)
     if (m_gpio_initialized) {
         tout << "GPIO already initialized.\n";
         return true;
@@ -9671,27 +9678,29 @@ bool CameraDevice::init_gpio()
     tout << "Initializing GPIO " << GPIO_CHIP << " pin " << GPIO_TRIGGER_PIN << " (physical pin 32) using libgpiod...\n";
 
     // Open GPIO chip
-    m_gpio_chip = gpiod_chip_open_by_name(GPIO_CHIP);
-    if (!m_gpio_chip) {
+    struct gpiod_chip* chip = gpiod_chip_open_by_name(GPIO_CHIP);
+    if (!chip) {
         tout << "ERROR: Failed to open GPIO chip " << GPIO_CHIP << "\n";
         tout << "Make sure libgpiod is installed: sudo apt-get install libgpiod-dev\n";
         return false;
     }
+    m_gpio_chip = chip;
 
     // Get GPIO line
-    m_gpio_line = gpiod_chip_get_line(m_gpio_chip, GPIO_TRIGGER_PIN);
-    if (!m_gpio_line) {
+    struct gpiod_line* line = gpiod_chip_get_line(chip, GPIO_TRIGGER_PIN);
+    if (!line) {
         tout << "ERROR: Failed to get GPIO line " << GPIO_TRIGGER_PIN << "\n";
-        gpiod_chip_close(m_gpio_chip);
+        gpiod_chip_close(chip);
         m_gpio_chip = nullptr;
         return false;
     }
+    m_gpio_line = line;
 
     // Request line as output, initially LOW
-    int ret = gpiod_line_request_output(m_gpio_line, "RemoteCli", 0);
+    int ret = gpiod_line_request_output(line, "RemoteCli", 0);
     if (ret < 0) {
         tout << "ERROR: Failed to request GPIO line as output\n";
-        gpiod_chip_close(m_gpio_chip);
+        gpiod_chip_close(chip);
         m_gpio_chip = nullptr;
         m_gpio_line = nullptr;
         return false;
@@ -9700,10 +9709,15 @@ bool CameraDevice::init_gpio()
     m_gpio_initialized = true;
     tout << "GPIO pin " << GPIO_TRIGGER_PIN << " initialized successfully using libgpiod C API.\n";
     return true;
+#else
+    tout << "ERROR: GPIO control only supported on Linux.\n";
+    return false;
+#endif
 }
 
 void CameraDevice::cleanup_gpio()
 {
+#if defined(__linux__)
     if (!m_gpio_initialized) {
         return;
     }
@@ -9712,34 +9726,43 @@ void CameraDevice::cleanup_gpio()
 
     // Set pin to LOW before cleanup
     if (m_gpio_line) {
-        gpiod_line_set_value(m_gpio_line, 0);
-        gpiod_line_release(m_gpio_line);
+        struct gpiod_line* line = static_cast<struct gpiod_line*>(m_gpio_line);
+        gpiod_line_set_value(line, 0);
+        gpiod_line_release(line);
         m_gpio_line = nullptr;
     }
 
     if (m_gpio_chip) {
-        gpiod_chip_close(m_gpio_chip);
+        struct gpiod_chip* chip = static_cast<struct gpiod_chip*>(m_gpio_chip);
+        gpiod_chip_close(chip);
         m_gpio_chip = nullptr;
     }
 
     m_gpio_initialized = false;
     tout << "GPIO cleanup complete.\n";
+#endif
 }
 
 void CameraDevice::gpio_trigger_press()
 {
+#if defined(__linux__)
     // Set GPIO HIGH (shutter press) - direct call, <1ms overhead
     if (m_gpio_line) {
-        gpiod_line_set_value(m_gpio_line, 1);
+        struct gpiod_line* line = static_cast<struct gpiod_line*>(m_gpio_line);
+        gpiod_line_set_value(line, 1);
     }
+#endif
 }
 
 void CameraDevice::gpio_trigger_release()
 {
+#if defined(__linux__)
     // Set GPIO LOW (shutter release) - direct call, <1ms overhead
     if (m_gpio_line) {
-        gpiod_line_set_value(m_gpio_line, 0);
+        struct gpiod_line* line = static_cast<struct gpiod_line*>(m_gpio_line);
+        gpiod_line_set_value(line, 0);
     }
+#endif
 }
 
 // ============================================================================
