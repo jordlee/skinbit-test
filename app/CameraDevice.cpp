@@ -9668,27 +9668,48 @@ bool CameraDevice::init_gpio()
 
     tout << "Initializing GPIO pin " << GPIO_TRIGGER_PIN << "...\n";
 
-    // Export GPIO pin
-    std::ofstream export_file("/sys/class/gpio/export");
-    if (!export_file.is_open()) {
-        tout << "ERROR: Failed to open GPIO export file. Run with sudo?\n";
-        return false;
-    }
-    export_file << GPIO_TRIGGER_PIN;
-    export_file.close();
+    // Check if pin is already exported
+    std::string gpio_path = "/sys/class/gpio/gpio" + std::to_string(GPIO_TRIGGER_PIN);
+    std::ifstream check_export(gpio_path + "/direction");
+    bool already_exported = check_export.is_open();
+    check_export.close();
 
-    // Wait for sysfs to create the pin directory
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (!already_exported) {
+        // Export GPIO pin
+        std::ofstream export_file("/sys/class/gpio/export");
+        if (!export_file.is_open()) {
+            tout << "ERROR: Failed to open GPIO export file. Run with sudo?\n";
+            return false;
+        }
+        export_file << GPIO_TRIGGER_PIN;
+        export_file.close();
+
+        // Wait for sysfs to create the pin directory
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    } else {
+        tout << "GPIO pin " << GPIO_TRIGGER_PIN << " already exported.\n";
+    }
 
     // Set pin direction to output
-    std::string direction_path = "/sys/class/gpio/gpio" + std::to_string(GPIO_TRIGGER_PIN) + "/direction";
+    std::string direction_path = gpio_path + "/direction";
     std::ofstream direction_file(direction_path);
     if (!direction_file.is_open()) {
         tout << "ERROR: Failed to set GPIO direction.\n";
+        tout << "Check permissions: ls -l " << direction_path << "\n";
+        tout << "Try: sudo chmod 666 /sys/class/gpio/gpio" << GPIO_TRIGGER_PIN << "/*\n";
         return false;
     }
     direction_file << "out";
     direction_file.close();
+
+    // Verify direction was set
+    std::ifstream verify_direction(direction_path);
+    std::string dir_value;
+    if (verify_direction.is_open()) {
+        std::getline(verify_direction, dir_value);
+        verify_direction.close();
+        tout << "GPIO direction set to: " << dir_value << "\n";
+    }
 
     // Initialize pin to LOW
     gpio_trigger_release();
