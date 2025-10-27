@@ -9849,12 +9849,12 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         auto focus_set_elapsed = duration_cast<milliseconds>(after_focus_set - photo_start).count();
 
         // Give camera a moment to start driving before polling
-        std::this_thread::sleep_for(milliseconds(100));
+        std::this_thread::sleep_for(milliseconds(50));
 
         // Poll FocusDrivingStatus until NotDriving
         bool focus_complete = false;
         int poll_count = 0;
-        const int max_polls = 100; // 100 * 10ms = 1000ms max wait
+        const int max_polls = 50; // 100 * 10ms = 1000ms max wait
         bool was_driving = false;
 
         while (!focus_complete && poll_count < max_polls) {
@@ -9903,13 +9903,13 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         auto press_elapsed = duration_cast<milliseconds>(after_press - after_focus_ready).count();
 
         // Hold shutter for 200ms
-        //std::this_thread::sleep_for(milliseconds(200));
+        std::this_thread::sleep_for(milliseconds(20));
 
         // GPIO trigger release
         gpio_trigger_release();
 
         // Wait 100ms for camera to complete capture cycle
-        std::this_thread::sleep_for(milliseconds(100));
+        std::this_thread::sleep_for(milliseconds(20));
 
         auto after_release = high_resolution_clock::now();
         auto cycle_time = duration_cast<milliseconds>(after_release - photo_start).count();
