@@ -9903,7 +9903,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         auto press_elapsed = duration_cast<milliseconds>(after_press - after_focus_ready).count();
 
         // Hold shutter for 200ms
-        std::this_thread::sleep_for(milliseconds(200));
+        //std::this_thread::sleep_for(milliseconds(200));
 
         // GPIO trigger release
         gpio_trigger_release();
