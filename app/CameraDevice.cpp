@@ -9893,35 +9893,35 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
             log(timeout_msg.str());
         }
 
-        auto after_focus_ready = high_resolution_clock::now();
+        // auto after_focus_ready = high_resolution_clock::now();
 
         // GPIO trigger press
-        auto t1 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        std::ostringstream msg1;
-        msg1 << "  " << t1 << "ms: GPIO press (set HIGH)\n";
-        log(msg1.str());
+        // auto t1 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
+        // std::ostringstream msg1;
+        // msg1 << "  " << t1 << "ms: GPIO press (set HIGH)\n";
+        // log(msg1.str());
         gpio_trigger_press();
 
         // Hold shutter delay
-        auto t2 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        std::ostringstream msg2;
-        msg2 << "  " << t2 << "ms: Hold delay (100ms)\n";
-        log(msg2.str());
+        // auto t2 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
+        // std::ostringstream msg2;
+        // msg2 << "  " << t2 << "ms: Hold delay (100ms)\n";
+        // log(msg2.str());
         std::this_thread::sleep_for(milliseconds(100));
 
         // GPIO trigger release
-        auto t3 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        std::ostringstream msg3;
-        msg3 << "  " << t3 << "ms: GPIO release (set LOW)\n";
-        log(msg3.str());
+        // auto t3 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
+        // std::ostringstream msg3;
+        // msg3 << "  " << t3 << "ms: GPIO release (set LOW)\n";
+        // log(msg3.str());
         gpio_trigger_release();
 
-        auto after_release = high_resolution_clock::now();
-        auto cycle_time = duration_cast<milliseconds>(after_release - photo_start).count();
+        // auto after_release = high_resolution_clock::now();
+        // auto cycle_time = duration_cast<milliseconds>(after_release - photo_start).count();
 
-        std::ostringstream photo_msg;
-        photo_msg << "  Cycle complete: " << cycle_time << "ms total (Focus=0x" << std::hex << current_focus << std::dec << ")\n";
-        log(photo_msg.str());
+        // std::ostringstream photo_msg;
+        // photo_msg << "  Cycle complete: " << cycle_time << "ms total (Focus=0x" << std::hex << current_focus << std::dec << ")\n";
+        // log(photo_msg.str());
 
         // Increment focus position (wrap around if needed)
         current_focus += focus_step;
@@ -10033,35 +10033,35 @@ void CameraDevice::speed_test_gpio_only()
     log("Starting capture sequence (GPIO trigger only)...\n\n");
 
     for (int i = 1; i <= TOTAL_PHOTOS; i++) {
-        auto photo_start = high_resolution_clock::now();
+        // auto photo_start = high_resolution_clock::now();
 
-        std::ostringstream photo_msg;
-        photo_msg << "\nPhoto " << i << "/" << TOTAL_PHOTOS << ":\n";
-        log(photo_msg.str());
+        // std::ostringstream photo_msg;
+        // photo_msg << "\nPhoto " << i << "/" << TOTAL_PHOTOS << ":\n";
+        // log(photo_msg.str());
 
         // GPIO trigger press
-        auto t1 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        log("  " + std::to_string(t1) + "ms: GPIO press (set HIGH)\n");
+        // auto t1 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
+        // log("  " + std::to_string(t1) + "ms: GPIO press (set HIGH)\n");
         gpio_trigger_press();
 
         // Hold shutter delay
-        auto t2 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        log("  " + std::to_string(t2) + "ms: Hold delay (50ms)\n");
+        // auto t2 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
+        // log("  " + std::to_string(t2) + "ms: Hold delay (50ms)\n");
         std::this_thread::sleep_for(milliseconds(100));
 
         // GPIO trigger release
-        auto t3 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        log("  " + std::to_string(t3) + "ms: GPIO release (set LOW)\n");
+        // auto t3 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
+        // log("  " + std::to_string(t3) + "ms: GPIO release (set LOW)\n");
         gpio_trigger_release();
 
         // Wait for image save
-        auto t4 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        log("  " + std::to_string(t4) + "ms: Save wait delay (100ms)\n");
-        std::this_thread::sleep_for(milliseconds(50));
+        // auto t4 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
+        // log("  " + std::to_string(t4) + "ms: Save wait delay (100ms)\n");
+        std::this_thread::sleep_for(milliseconds(100));
 
-        auto after_cycle = high_resolution_clock::now();
-        auto cycle_time = duration_cast<milliseconds>(after_cycle - photo_start).count();
-        log("  Cycle complete: " + std::to_string(cycle_time) + "ms total\n");
+        // auto after_cycle = high_resolution_clock::now();
+        // auto cycle_time = duration_cast<milliseconds>(after_cycle - photo_start).count();
+        // log("  Cycle complete: " + std::to_string(cycle_time) + "ms total\n");
     }
 
     auto test_end = high_resolution_clock::now();
