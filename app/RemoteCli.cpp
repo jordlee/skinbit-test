@@ -404,6 +404,7 @@ int main()
                     << "(6) Contents Operation Menu \n"
                     << "(7) Other Menu \n"
                     << "(8) ILX-LR1 GPIO Speed Test \n"
+                    << "(9) ILX-LR1 GPIO Only Test \n"
                     ;
 
                 cli::tout << "input> ";
@@ -1271,6 +1272,10 @@ int main()
                 else if (action == TEXT("8")) { /* ILX-LR1 GPIO Speed Test */
                     cli::tout << "Starting ILX-LR1 GPIO Speed Test...\n";
                     camera->speed_test_gpio_hardware_trigger();
+                }
+                else if (action == TEXT("9")) { /* ILX-LR1 GPIO Only Test */
+                    cli::tout << "Starting ILX-LR1 GPIO Only Test...\n";
+                    camera->speed_test_gpio_only();
                 }
                 cli::tout << std::endl;
             } // end of loop-C
