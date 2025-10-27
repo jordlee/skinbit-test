@@ -9751,43 +9751,6 @@ void CameraDevice::gpio_trigger_release()
 }
 
 // ============================================================================
-// Helper Function: Set Drive Mode
-// ============================================================================
-
-bool CameraDevice::set_drive_mode(CrInt64u Value)
-{
-    if (!m_device_handle) {
-        tout << "ERROR: set_drive_mode: Invalid device handle\n";
-        return false;
-    }
-
-    if (!is_connected()) {
-        tout << "ERROR: set_drive_mode: Camera not connected\n";
-        return false;
-    }
-
-    tout << "Setting drive mode to value: 0x" << std::hex << Value << std::dec << "\n";
-
-    SDK::CrDeviceProperty mode;
-    mode.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_DriveMode);
-    mode.SetCurrentValue(Value);
-    mode.SetValueType(SDK::CrDataType::CrDataType_UInt32Array);
-
-    auto err = SDK::SetDeviceProperty(m_device_handle, &mode);
-    if (CR_FAILED(err)) {
-        tout << "ERROR: Failed to set drive mode. Error: 0x" << std::hex << err << std::dec << "\n";
-        return false;
-    }
-
-    // Verify the drive mode was set
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    load_properties();
-
-    tout << "Drive mode set successfully.\n";
-    return true;
-}
-
-// ============================================================================
 // ILX-LR1 Speed Test with GPIO Hardware Trigger
 // ============================================================================
 
