@@ -330,7 +330,8 @@ private:
     PropertyValueTable m_prop;
 
     // GPIO configuration for Raspberry Pi hardware trigger
-    static constexpr int GPIO_TRIGGER_PIN = 7;  // BCM GPIO 7
+    static constexpr int GPIO_TRIGGER_PIN = 12;  // Physical pin 32, GPIO 12 on gpiochip4
+    static constexpr const char* GPIO_CHIP = "gpiochip4";
     bool m_gpio_initialized;
     bool m_lvEnbSet;
     SCRSDK::CrSdkControlMode m_modeSDK;

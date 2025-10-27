@@ -9666,56 +9666,32 @@ bool CameraDevice::init_gpio()
         return true;
     }
 
-    tout << "Initializing GPIO pin " << GPIO_TRIGGER_PIN << "...\n";
+    tout << "Initializing GPIO " << GPIO_CHIP << " pin " << GPIO_TRIGGER_PIN << " (physical pin 32)...\n";
 
-    // Check if pin is already exported
-    std::string gpio_path = "/sys/class/gpio/gpio" + std::to_string(GPIO_TRIGGER_PIN);
-    std::ifstream check_export(gpio_path + "/direction");
-    bool already_exported = check_export.is_open();
-    check_export.close();
-
-    if (!already_exported) {
-        // Export GPIO pin
-        std::ofstream export_file("/sys/class/gpio/export");
-        if (!export_file.is_open()) {
-            tout << "ERROR: Failed to open GPIO export file. Run with sudo?\n";
-            return false;
-        }
-        export_file << GPIO_TRIGGER_PIN;
-        export_file.close();
-
-        // Wait for sysfs to create the pin directory
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    } else {
-        tout << "GPIO pin " << GPIO_TRIGGER_PIN << " already exported.\n";
-    }
-
-    // Set pin direction to output
-    std::string direction_path = gpio_path + "/direction";
-    std::ofstream direction_file(direction_path);
-    if (!direction_file.is_open()) {
-        tout << "ERROR: Failed to set GPIO direction.\n";
-        tout << "Check permissions: ls -l " << direction_path << "\n";
-        tout << "Try: sudo chmod 666 /sys/class/gpio/gpio" << GPIO_TRIGGER_PIN << "/*\n";
+    // Test if gpioset command is available
+    std::string test_cmd = "which gpioset > /dev/null 2>&1";
+    int result = std::system(test_cmd.c_str());
+    if (result != 0) {
+        tout << "ERROR: gpioset command not found.\n";
+        tout << "Install libgpiod: sudo apt-get install gpiod\n";
         return false;
-    }
-    direction_file << "out";
-    direction_file.close();
-
-    // Verify direction was set
-    std::ifstream verify_direction(direction_path);
-    std::string dir_value;
-    if (verify_direction.is_open()) {
-        std::getline(verify_direction, dir_value);
-        verify_direction.close();
-        tout << "GPIO direction set to: " << dir_value << "\n";
     }
 
     // Initialize pin to LOW
     gpio_trigger_release();
 
+    // Verify we can control the pin
+    std::string verify_cmd = "gpioget " + std::string(GPIO_CHIP) + " " + std::to_string(GPIO_TRIGGER_PIN) + " > /dev/null 2>&1";
+    result = std::system(verify_cmd.c_str());
+    if (result != 0) {
+        tout << "ERROR: Cannot access GPIO pin.\n";
+        tout << "Command: gpioget " << GPIO_CHIP << " " << GPIO_TRIGGER_PIN << "\n";
+        return false;
+    }
+
     m_gpio_initialized = true;
     tout << "GPIO pin " << GPIO_TRIGGER_PIN << " initialized successfully.\n";
+    tout << "Using commands: gpioset " << GPIO_CHIP << " " << GPIO_TRIGGER_PIN << "=0/1\n";
     return true;
 }
 
@@ -9727,15 +9703,8 @@ void CameraDevice::cleanup_gpio()
 
     tout << "Cleaning up GPIO pin " << GPIO_TRIGGER_PIN << "...\n";
 
-    // Set pin to LOW before unexport
+    // Set pin to LOW before cleanup
     gpio_trigger_release();
-
-    // Unexport GPIO pin
-    std::ofstream unexport_file("/sys/class/gpio/unexport");
-    if (unexport_file.is_open()) {
-        unexport_file << GPIO_TRIGGER_PIN;
-        unexport_file.close();
-    }
 
     m_gpio_initialized = false;
     tout << "GPIO cleanup complete.\n";
@@ -9743,32 +9712,21 @@ void CameraDevice::cleanup_gpio()
 
 void CameraDevice::gpio_trigger_press()
 {
-    if (!m_gpio_initialized) {
-        tout << "ERROR: GPIO not initialized.\n";
-        return;
-    }
-
-    std::string value_path = "/sys/class/gpio/gpio" + std::to_string(GPIO_TRIGGER_PIN) + "/value";
-    std::ofstream value_file(value_path);
-    if (value_file.is_open()) {
-        value_file << "1";
-        value_file.close();
-    }
+    // Set GPIO HIGH (shutter press) using mode=time with long duration
+    // This keeps the pin high until we call release
+    std::string cmd = "timeout 5 gpioset --mode=time --sec=5 " + std::string(GPIO_CHIP) +
+                      " " + std::to_string(GPIO_TRIGGER_PIN) + "=1 &";
+    std::system(cmd.c_str());
+    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Let command start
 }
 
 void CameraDevice::gpio_trigger_release()
 {
-    if (!m_gpio_initialized) {
-        tout << "ERROR: GPIO not initialized.\n";
-        return;
-    }
-
-    std::string value_path = "/sys/class/gpio/gpio" + std::to_string(GPIO_TRIGGER_PIN) + "/value";
-    std::ofstream value_file(value_path);
-    if (value_file.is_open()) {
-        value_file << "0";
-        value_file.close();
-    }
+    // Kill any running gpioset and set to LOW
+    std::system("pkill -9 gpioset 2>/dev/null");
+    std::string cmd = "gpioset --mode=time --usec=100000 " + std::string(GPIO_CHIP) +
+                      " " + std::to_string(GPIO_TRIGGER_PIN) + "=0";
+    std::system(cmd.c_str());
 }
 
 // ============================================================================
