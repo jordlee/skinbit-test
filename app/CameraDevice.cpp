@@ -10295,12 +10295,18 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
     uint16_t focus_min = m_prop.focus_position_setting.possible.at(0);
     uint16_t focus_max = m_prop.focus_position_setting.possible.at(1);
-    uint16_t focus_step = m_prop.focus_position_setting.possible.at(2);
+    uint16_t camera_step = m_prop.focus_position_setting.possible.at(2);
 
-    std::ostringstream focus_range;
-    focus_range << "Focus range: 0x" << std::hex << focus_min << " to 0x" << focus_max
-                << " (step: 0x" << focus_step << ")" << std::dec << "\n\n";
-    log(focus_range.str());
+    // Use larger step for visible focus changes (about 1/10 of range)
+    uint16_t focus_range = focus_max - focus_min;
+    uint16_t focus_step = focus_range / 10;  // Large steps for visible changes
+    if (focus_step < 100) focus_step = 100;  // Minimum step of 100
+
+    std::ostringstream focus_range_msg;
+    focus_range_msg << "Focus range: 0x" << std::hex << focus_min << " to 0x" << focus_max
+                    << " (camera step: 0x" << camera_step << ", using step: 0x" << focus_step
+                    << " = ~" << std::dec << (focus_range / focus_step) << " positions)\n\n";
+    log(focus_range_msg.str());
 
     // Set save destination to Host PC only
     log("Setting save destination to Host PC only...\n");
@@ -10353,7 +10359,7 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
         // With focus GPIO grounded, just wait fixed time for focus to complete
         // Focus driving polling doesn't work reliably when focus is hardware-locked
-        std::this_thread::sleep_for(milliseconds(50));
+        std::this_thread::sleep_for(milliseconds(100));
 
         std::ostringstream focus_msg;
         focus_msg << "  [FOCUS] Photo " << i << ": Waited 300ms for focus position change (Focus=0x"
@@ -10362,7 +10368,7 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
         // GPIO trigger press (focus is already locked via grounded GPIO)
         gpio_trigger_press();
-        std::this_thread::sleep_for(milliseconds(50));
+        std::this_thread::sleep_for(milliseconds(25));
 
         // GPIO trigger release
         gpio_trigger_release();
