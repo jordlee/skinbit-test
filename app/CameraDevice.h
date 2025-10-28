@@ -79,6 +79,7 @@ public:
     // ILX-LR1 Speed Test with GPIO hardware trigger
     void speed_test_gpio_hardware_trigger();
     void speed_test_gpio_only();
+    void speed_test_gpio_focus_toggle();
 
     /*** Property operations ***/
     // Should be const functions, but requires load property, which is not
