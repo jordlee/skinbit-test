@@ -10415,7 +10415,7 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
         gpio_trigger_release();
 
         // Wait for camera to complete capture and save to host PC
-        std::this_thread::sleep_for(milliseconds(200));
+        std::this_thread::sleep_for(milliseconds(150));
 
         // Check if photo was saved successfully
         int actual_save_count = m_save_total_count;
