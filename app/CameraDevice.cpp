@@ -10297,15 +10297,16 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
     uint16_t focus_max = m_prop.focus_position_setting.possible.at(1);
     uint16_t camera_step = m_prop.focus_position_setting.possible.at(2);
 
-    // Use larger step for visible focus changes (about 1/10 of range)
+    // Calculate step to sweep from min to max across all 30 photos
+    const int TOTAL_PHOTOS = 30;
     uint16_t focus_range = focus_max - focus_min;
-    uint16_t focus_step = focus_range / 10;  // Large steps for visible changes
-    if (focus_step < 100) focus_step = 100;  // Minimum step of 100
+    uint16_t focus_step = focus_range / (TOTAL_PHOTOS - 1);  // Divide range by 29 steps to get 30 positions
 
     std::ostringstream focus_range_msg;
     focus_range_msg << "Focus range: 0x" << std::hex << focus_min << " to 0x" << focus_max
-                    << " (camera step: 0x" << camera_step << ", using step: 0x" << focus_step
-                    << " = ~" << std::dec << (focus_range / focus_step) << " positions)\n\n";
+                    << " (camera step: 0x" << camera_step << ")\n";
+    focus_range_msg << "Test: " << std::dec << TOTAL_PHOTOS << " photos sweeping from MINIMUM (close) to INFINITY (far)\n";
+    focus_range_msg << "Focus step per photo: 0x" << std::hex << focus_step << std::dec << "\n\n";
     log(focus_range_msg.str());
 
     // Set save destination to Host PC only
@@ -10334,7 +10335,6 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
     std::this_thread::sleep_for(milliseconds(500));
 
-    const int TOTAL_PHOTOS = 30;
     uint16_t current_focus = focus_min;
 
     // Track photo saves - reset counter before test
@@ -10343,7 +10343,8 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
     auto test_start = high_resolution_clock::now();
 
-    log("Starting capture sequence (SDK focus + GPIO trigger, focus GPIO grounded)...\n\n");
+    log("Starting capture sequence (SDK focus + GPIO trigger, focus GPIO grounded)...\n");
+    log("Focus will sweep from MINIMUM (close) to INFINITY (far) over 30 shots\n\n");
 
     for (int i = 1; i <= TOTAL_PHOTOS; i++) {
         int expected_save_count = photos_saved_before + i;
@@ -10376,13 +10377,9 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
         // Wait for camera to complete capture and save to host PC
         std::this_thread::sleep_for(milliseconds(150));
 
-        // Check if photo was saved successfully
+        // Check if photo was saved successfully (only log failures)
         int actual_save_count = m_save_total_count;
-        if (actual_save_count >= expected_save_count) {
-            std::ostringstream save_msg;
-            save_msg << "  [SAVE] Photo " << i << ": SUCCESS (Total saved: " << actual_save_count << ")\n";
-            log(save_msg.str());
-        } else {
+        if (actual_save_count < expected_save_count) {
             std::ostringstream fail_msg;
             fail_msg << "  [SAVE] Photo " << i << ": *** FAILED *** (Expected: " << expected_save_count
                     << ", Actual: " << actual_save_count << ")\n";
@@ -10390,10 +10387,10 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
             failed_photos.push_back(i);
         }
 
-        // Increment focus position (wrap around if needed)
+        // Increment focus position (sweep from min to max, no wrap-around)
         current_focus += focus_step;
         if (current_focus > focus_max) {
-            current_focus = focus_min;
+            current_focus = focus_max;  // Clamp to max (infinity)
         }
     }
 
