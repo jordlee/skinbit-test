@@ -10036,18 +10036,18 @@ void CameraDevice::speed_test_gpio_only()
     log(std::string("Started: ") + start_str + "\n");
     log(std::string(80, '=') + "\n\n");
 
-    // Set save destination to SD card only
-    log("Setting save destination to SD card only...\n");
+    // Set save destination to Host PC only
+    log("Setting save destination to Host PC only...\n");
     SDK::CrDeviceProperty saveDest;
     saveDest.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_StillImageStoreDestination);
-    saveDest.SetCurrentValue(SDK::CrStillImageStoreDestination::CrStillImageStoreDestination_MemoryCard);
+    saveDest.SetCurrentValue(SDK::CrStillImageStoreDestination::CrStillImageStoreDestination_HostPC);
     saveDest.SetValueType(SDK::CrDataType::CrDataType_UInt16Array);
 
     auto result = SDK::SetDeviceProperty(m_device_handle, &saveDest);
     if (CR_FAILED(result)) {
-        log("WARNING: Could not set save destination to SD card.\n");
+        log("WARNING: Could not set save destination to Host PC.\n");
     } else {
-        log("Save destination set to SD card.\n");
+        log("Save destination set to Host PC.\n");
     }
 
     // Set drive mode to Single Shot
