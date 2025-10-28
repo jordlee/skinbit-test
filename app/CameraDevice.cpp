@@ -10040,7 +10040,7 @@ void CameraDevice::speed_test_gpio_only()
     log("Setting save destination to Host PC only...\n");
     SDK::CrDeviceProperty saveDest;
     saveDest.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_StillImageStoreDestination);
-    saveDest.SetCurrentValue(SDK::CrStillImageStoreDestination::CrStillImageStoreDestination_HostPC);
+    saveDest.SetCurrentValue(SDK::CrStillImageStoreDestination::CrStillImageStoreDestination_MemoryCard);
     saveDest.SetValueType(SDK::CrDataType::CrDataType_UInt16Array);
 
     auto result = SDK::SetDeviceProperty(m_device_handle, &saveDest);
@@ -10079,12 +10079,12 @@ void CameraDevice::speed_test_gpio_only()
         // auto t1 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         // log("  " + std::to_string(t1) + "ms: GPIO press (set HIGH)\n");
         gpio_trigger_press();
-        std::this_thread::sleep_for(milliseconds(20));
+        std::this_thread::sleep_for(milliseconds(50));
         gpio_trigger_release();
 
         // Wait for camera to complete capture and save to SD card
         // Need sufficient time for camera processing + SD card write
-        std::this_thread::sleep_for(milliseconds(200));
+        std::this_thread::sleep_for(milliseconds(150));
 
         // auto after_cycle = high_resolution_clock::now();
         // auto cycle_time = duration_cast<milliseconds>(after_cycle - photo_start).count();
