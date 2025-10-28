@@ -10326,29 +10326,44 @@ void CameraDevice::speed_test_gpio_focus_toggle()
     log("Starting capture sequence (GPIO focus toggle + trigger)...\n\n");
 
     for (int i = 1; i <= TOTAL_PHOTOS; i++) {
+        auto photo_start = high_resolution_clock::now();
+        auto elapsed_start = duration_cast<milliseconds>(photo_start - test_start).count();
+
         std::ostringstream progress;
-        progress << "Photo " << i << "/" << TOTAL_PHOTOS << "\n";
+        progress << "\n=== Photo " << i << "/" << TOTAL_PHOTOS << " (Start: " << elapsed_start << "ms) ===\n";
         log(progress.str());
 
         // Set focus GPIO LOW (lock focus)
-        log("  Focus LOW (lock)\n");
+        auto t1 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         gpio_focus_low();
+        log("  " + std::to_string(t1) + "ms: GPIO 4 (Focus) → LOW (locked)\n");
         std::this_thread::sleep_for(milliseconds(35));
+
         // GPIO trigger press
-        log("  Trigger LOW (press)\n");
+        auto t2 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         gpio_trigger_press();
+        log("  " + std::to_string(t2) + "ms: GPIO 12 (Trigger) → LOW (pressed)\n");
         std::this_thread::sleep_for(milliseconds(50));
 
         // GPIO trigger release
-        log("  Trigger HIGH (release)\n");
+        auto t3 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         gpio_trigger_release();
+        log("  " + std::to_string(t3) + "ms: GPIO 12 (Trigger) → HIGH (released)\n");
+
         // Set focus GPIO HIGH (unlock focus)
         std::this_thread::sleep_for(milliseconds(35));
-        log("  Focus HIGH (unlock)\n");
+        auto t4 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         gpio_focus_high();
+        log("  " + std::to_string(t4) + "ms: GPIO 4 (Focus) → HIGH (unlocked)\n");
 
         // Wait for camera to complete capture and save
         std::this_thread::sleep_for(milliseconds(150));
+
+        auto photo_end = high_resolution_clock::now();
+        auto cycle_time = duration_cast<milliseconds>(photo_end - photo_start).count();
+        auto elapsed_end = duration_cast<milliseconds>(photo_end - test_start).count();
+        log("  Cycle complete: " + std::to_string(cycle_time) + "ms (Total elapsed: "
+            + std::to_string(elapsed_end) + "ms)\n");
     }
 
     auto test_end = high_resolution_clock::now();
