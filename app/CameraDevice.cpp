@@ -4793,6 +4793,7 @@ void CameraDevice::OnCompleteDownload(CrChar* filename, CrInt32u type )
     {
     case SCRSDK::CrDownloadSettingFileType_None:
         tout << "Complete download. File: " << file.data() << '\n';
+        m_save_total_count++;  // Increment async counter for photo saves
         break;
     case SCRSDK::CrDownloadSettingFileType_Setup:
         tout << "Complete download. Camera Setting File: " << file.data() << '\n';
@@ -10330,11 +10331,16 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
     const int TOTAL_PHOTOS = 30;
     uint16_t current_focus = focus_min;
 
+    // Track photo saves - reset counter before test
+    int photos_saved_before = m_save_total_count;
+    std::vector<int> failed_photos; // Track which photos failed
+
     auto test_start = high_resolution_clock::now();
 
     log("Starting capture sequence (SDK focus + GPIO trigger, focus GPIO grounded)...\n\n");
 
     for (int i = 1; i <= TOTAL_PHOTOS; i++) {
+        int expected_save_count = photos_saved_before + i;
         auto photo_start = high_resolution_clock::now();
 
         // Set focus position via SDK
@@ -10411,6 +10417,20 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
         // Wait for camera to complete capture and save to host PC
         std::this_thread::sleep_for(milliseconds(200));
 
+        // Check if photo was saved successfully
+        int actual_save_count = m_save_total_count;
+        if (actual_save_count >= expected_save_count) {
+            std::ostringstream save_msg;
+            save_msg << "  [SAVE] Photo " << i << ": SUCCESS (Total saved: " << actual_save_count << ")\n";
+            log(save_msg.str());
+        } else {
+            std::ostringstream fail_msg;
+            fail_msg << "  [SAVE] Photo " << i << ": *** FAILED *** (Expected: " << expected_save_count
+                    << ", Actual: " << actual_save_count << ")\n";
+            log(fail_msg.str());
+            failed_photos.push_back(i);
+        }
+
         // Increment focus position (wrap around if needed)
         current_focus += focus_step;
         if (current_focus > focus_max) {
@@ -10421,12 +10441,33 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
     auto test_end = high_resolution_clock::now();
     auto total_time = duration_cast<milliseconds>(test_end - test_start).count();
     double total_seconds = total_time / 1000.0;
-    double avg_fps = TOTAL_PHOTOS / total_seconds;
+
+    // Calculate actual photos saved (async callback increments counter)
+    int total_saved = m_save_total_count - photos_saved_before;
+    int total_failed = TOTAL_PHOTOS - total_saved;
+
+    // Calculate FPS based on actual saved photos
+    double actual_fps = total_saved / total_seconds;
+    double attempted_fps = TOTAL_PHOTOS / total_seconds;
 
     std::ostringstream summary;
     summary << "\n=== Test Complete ===\n";
-    summary << "Total time: " << total_seconds << " seconds\n";
-    summary << "Average speed: " << std::fixed << std::setprecision(2) << avg_fps << " fps\n";
+    summary << "Photos attempted: " << TOTAL_PHOTOS << "\n";
+    summary << "Photos saved: " << total_saved << "\n";
+    summary << "Photos failed: " << total_failed << "\n";
+    if (!failed_photos.empty()) {
+        summary << "Failed photo numbers: ";
+        for (size_t i = 0; i < failed_photos.size(); ++i) {
+            summary << failed_photos[i];
+            if (i < failed_photos.size() - 1) summary << ", ";
+        }
+        summary << "\n";
+    }
+    summary << "Total time: " << std::fixed << std::setprecision(2) << total_seconds << " seconds\n";
+    summary << "Attempted speed: " << std::fixed << std::setprecision(2) << attempted_fps << " fps\n";
+    summary << "Actual speed (saved): " << std::fixed << std::setprecision(2) << actual_fps << " fps\n";
+    summary << "Success rate: " << std::fixed << std::setprecision(1)
+            << (100.0 * total_saved / TOTAL_PHOTOS) << "%\n";
     summary << "\nLog saved to: " << log_filename << "\n";
     summary << std::string(80, '=') << "\n\n";
     log(summary.str());

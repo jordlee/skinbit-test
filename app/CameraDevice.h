@@ -334,6 +334,7 @@ private:
     std::atomic<bool> m_connected;
     ConnectionType m_conn_type;
     PropertyValueTable m_prop;
+    std::atomic<int> m_save_total_count{0};  // Track total photos saved (async callback)
 
     // GPIO configuration for Raspberry Pi hardware trigger
     static constexpr int GPIO_TRIGGER_PIN = 12;  // Physical pin 32, GPIO 12 on gpiochip4
