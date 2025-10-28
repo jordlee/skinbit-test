@@ -9980,14 +9980,12 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         auto after_focus_set = high_resolution_clock::now();
         auto focus_set_elapsed = duration_cast<milliseconds>(after_focus_set - photo_start).count();
 
-        // Give camera a moment to start driving before polling
-        std::this_thread::sleep_for(milliseconds(50));
-
-        // Poll FocusDrivingStatus until NotDriving
+        // Poll FocusDrivingStatus immediately - wait for driving to start, then see 2 consecutive NotDriving
         bool focus_complete = false;
         int poll_count = 0;
-        const int max_polls = 50; // 100 * 10ms = 1000ms max wait
+        const int max_polls = 100; // 100 * 10ms = 1000ms max wait
         bool was_driving = false;
+        int consecutive_not_driving = 0;
 
         while (!focus_complete && poll_count < max_polls) {
             CrInt32u propCode = SDK::CrDevicePropertyCode::CrDeviceProperty_FocusDrivingStatus;
@@ -10002,16 +10000,28 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
 
                 if (status == SDK::CrFocusDrivingStatus::CrFocusDrivingStatus_Driving) {
                     was_driving = true;
+                    consecutive_not_driving = 0; // Reset counter
                     std::ostringstream driving_msg;
                     driving_msg << "  [FOCUS] Photo " << i << ": Driving (poll #" << poll_count + 1 << ")\n";
                     log(driving_msg.str());
                 } else if (status == SDK::CrFocusDrivingStatus::CrFocusDrivingStatus_NotDriving) {
-                    focus_complete = true;
-                    std::ostringstream ready_msg;
-                    ready_msg << "  [FOCUS] Photo " << i << ": NotDriving (poll #" << poll_count + 1
-                              << ", was_driving=" << (was_driving ? "yes" : "no") << ")\n";
-                    log(ready_msg.str());
-                    break;
+                    // Only count NotDriving if we've seen Driving first (avoid false positives)
+                    if (was_driving) {
+                        consecutive_not_driving++;
+                        std::ostringstream notdriving_msg;
+                        notdriving_msg << "  [FOCUS] Photo " << i << ": NotDriving #" << consecutive_not_driving
+                                      << " (poll #" << poll_count + 1 << ")\n";
+                        log(notdriving_msg.str());
+
+                        // Need 2 consecutive NotDriving readings to confirm focus complete
+                        if (consecutive_not_driving >= 2) {
+                            focus_complete = true;
+                            std::ostringstream ready_msg;
+                            ready_msg << "  [FOCUS] Photo " << i << ": Complete (2 consecutive NotDriving)\n";
+                            log(ready_msg.str());
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -10021,7 +10031,8 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
 
         if (!focus_complete) {
             std::ostringstream timeout_msg;
-            timeout_msg << "  [FOCUS] Photo " << i << ": TIMEOUT after " << (poll_count * 10) << "ms\n";
+            timeout_msg << "  [FOCUS] Photo " << i << ": TIMEOUT after " << (poll_count * 10) << "ms"
+                       << " (was_driving=" << (was_driving ? "yes" : "no") << ")\n";
             log(timeout_msg.str());
         }
 
@@ -10029,7 +10040,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         gpio_focus_low();
 
         // Small delay to ensure camera registers focus lock before shutter trigger
-        std::this_thread::sleep_for(milliseconds(150));
+        std::this_thread::sleep_for(milliseconds(100));
 
         // auto after_focus_ready = high_resolution_clock::now();
 
