@@ -10360,7 +10360,7 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
         // With focus GPIO grounded, just wait fixed time for focus to complete
         // Focus driving polling doesn't work reliably when focus is hardware-locked
-        std::this_thread::sleep_for(milliseconds(300));
+        std::this_thread::sleep_for(milliseconds(200));
 
         // Read back actual focus position for first and last photos to verify it's changing
         if (i == 1 || i == TOTAL_PHOTOS) {
