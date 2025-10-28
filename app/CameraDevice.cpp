@@ -10230,16 +10230,16 @@ void CameraDevice::speed_test_gpio_only()
 }
 
 // ============================================================================
-// ILX-LR1 Speed Test - GPIO Focus Toggle Only (No SDK Focus Commands)
+// ILX-LR1 Speed Test - GPIO Trigger with SDK Focus (Focus GPIO Grounded)
 // ============================================================================
 
-void CameraDevice::speed_test_gpio_focus_toggle()
+void CameraDevice::speed_test_gpio_with_sdk_focus()
 {
     using namespace std::chrono;
 
     tout << "\n";
     tout << std::string(80, '=') << "\n";
-    tout << "ILX-LR1 Speed Test - GPIO Focus Toggle Only\n";
+    tout << "ILX-LR1 Speed Test - GPIO Trigger with SDK Focus (Focus GPIO Grounded)\n";
     tout << std::string(80, '=') << "\n\n";
 
     if (!is_connected()) {
@@ -10247,16 +10247,9 @@ void CameraDevice::speed_test_gpio_focus_toggle()
         return;
     }
 
-    // Initialize GPIO for trigger
+    // Initialize GPIO for trigger only (focus is physically grounded)
     if (!init_gpio()) {
         tout << "ERROR: Failed to initialize trigger GPIO. Cannot run speed test.\n";
-        return;
-    }
-
-    // Initialize Focus GPIO
-    if (!init_gpio_focus()) {
-        tout << "ERROR: Failed to initialize Focus GPIO. Cannot run speed test.\n";
-        cleanup_gpio();
         return;
     }
 
@@ -10266,7 +10259,7 @@ void CameraDevice::speed_test_gpio_focus_toggle()
     char timestamp[32];
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", localtime(&time_t_now));
 
-    std::string log_filename = std::string("speed_test_gpio_focus_toggle_") + timestamp + ".log";
+    std::string log_filename = std::string("speed_test_gpio_sdk_focus_") + timestamp + ".log";
     std::ofstream log_file(log_filename);
 
     // Lambda to write to both console and file
@@ -10280,15 +10273,33 @@ void CameraDevice::speed_test_gpio_focus_toggle()
 
     log("\n");
     log(std::string(80, '=') + "\n");
-    log("ILX-LR1 Speed Test - GPIO Focus Toggle Only\n");
+    log("ILX-LR1 Speed Test - GPIO Trigger with SDK Focus\n");
     log("GPIO Trigger Pin: " + std::to_string(GPIO_TRIGGER_PIN) + "\n");
-    log("GPIO Focus Pin: " + std::to_string(GPIO_FOCUS_PIN) + "\n");
+    log("Focus GPIO: Physically grounded (always locked)\n");
 
     auto start_time_t = system_clock::to_time_t(now);
     char start_str[32];
     strftime(start_str, sizeof(start_str), "%Y-%m-%d %H:%M:%S", localtime(&start_time_t));
     log(std::string("Started: ") + start_str + "\n");
     log(std::string(80, '=') + "\n\n");
+
+    // Load properties to get focus position range
+    load_properties();
+    if (m_prop.focus_position_setting.possible.size() < 3) {
+        log("ERROR: Focus Position Setting not supported on this camera.\n");
+        log_file.close();
+        cleanup_gpio();
+        return;
+    }
+
+    uint16_t focus_min = m_prop.focus_position_setting.possible.at(0);
+    uint16_t focus_max = m_prop.focus_position_setting.possible.at(1);
+    uint16_t focus_step = m_prop.focus_position_setting.possible.at(2);
+
+    std::ostringstream focus_range;
+    focus_range << "Focus range: 0x" << std::hex << focus_min << " to 0x" << focus_max
+                << " (step: 0x" << focus_step << ")" << std::dec << "\n\n";
+    log(focus_range.str());
 
     // Set save destination to Host PC only
     log("Setting save destination to Host PC only...\n");
@@ -10314,56 +10325,97 @@ void CameraDevice::speed_test_gpio_focus_toggle()
     }
     log("\n");
 
-    log("  Focus HIGH (unlock)\n");
-    gpio_focus_high();
-
     std::this_thread::sleep_for(milliseconds(500));
 
     const int TOTAL_PHOTOS = 30;
+    uint16_t current_focus = focus_min;
 
     auto test_start = high_resolution_clock::now();
 
-    log("Starting capture sequence (GPIO focus toggle + trigger)...\n\n");
+    log("Starting capture sequence (SDK focus + GPIO trigger, focus GPIO grounded)...\n\n");
 
     for (int i = 1; i <= TOTAL_PHOTOS; i++) {
         auto photo_start = high_resolution_clock::now();
-        auto elapsed_start = duration_cast<milliseconds>(photo_start - test_start).count();
 
-        std::ostringstream progress;
-        progress << "\n=== Photo " << i << "/" << TOTAL_PHOTOS << " (Start: " << elapsed_start << "ms) ===\n";
-        log(progress.str());
+        // Set focus position via SDK
+        SDK::CrDeviceProperty focusProp;
+        focusProp.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_FocusPositionSetting);
+        focusProp.SetCurrentValue((CrInt64u)current_focus);
+        focusProp.SetValueType(SDK::CrDataType::CrDataType_UInt16);
 
-        // Set focus GPIO LOW (lock focus)
-        auto t1 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        gpio_focus_low();
-        log("  " + std::to_string(t1) + "ms: GPIO 4 (Focus) → LOW (locked)\n");
-        std::this_thread::sleep_for(milliseconds(35));
+        SDK::SetDeviceProperty(m_device_handle, &focusProp);
 
-        // GPIO trigger press
-        auto t2 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
+        // Poll FocusDrivingStatus immediately - wait for driving to start, then see 2 consecutive NotDriving
+        bool focus_complete = false;
+        int poll_count = 0;
+        const int max_polls = 100; // 100 * 10ms = 1000ms max wait
+        bool was_driving = false;
+        int consecutive_not_driving = 0;
+
+        while (!focus_complete && poll_count < max_polls) {
+            CrInt32u propCode = SDK::CrDevicePropertyCode::CrDeviceProperty_FocusDrivingStatus;
+            CrInt32 numProps = 0;
+            SDK::CrDeviceProperty* properties = nullptr;
+            SDK::CrError err = SDK::GetSelectDeviceProperties(m_device_handle, 1,
+                &propCode, &properties, &numProps);
+
+            if (CR_SUCCEEDED(err) && properties && numProps > 0) {
+                CrInt8u status = properties[0].GetCurrentValue();
+                SDK::ReleaseDeviceProperties(m_device_handle, properties);
+
+                if (status == SDK::CrFocusDrivingStatus::CrFocusDrivingStatus_Driving) {
+                    was_driving = true;
+                    consecutive_not_driving = 0; // Reset counter
+                    std::ostringstream driving_msg;
+                    driving_msg << "  [FOCUS] Photo " << i << ": Driving (poll #" << poll_count + 1 << ")\n";
+                    log(driving_msg.str());
+                } else if (status == SDK::CrFocusDrivingStatus::CrFocusDrivingStatus_NotDriving) {
+                    // Only count NotDriving if we've seen Driving first (avoid false positives)
+                    if (was_driving) {
+                        consecutive_not_driving++;
+                        std::ostringstream notdriving_msg;
+                        notdriving_msg << "  [FOCUS] Photo " << i << ": NotDriving #" << consecutive_not_driving
+                                      << " (poll #" << poll_count + 1 << ")\n";
+                        log(notdriving_msg.str());
+
+                        // Need 2 consecutive NotDriving readings to confirm focus complete
+                        if (consecutive_not_driving >= 2) {
+                            focus_complete = true;
+                            std::ostringstream ready_msg;
+                            ready_msg << "  [FOCUS] Photo " << i << ": Complete (2 consecutive NotDriving)\n";
+                            log(ready_msg.str());
+                            break;
+                        }
+                    }
+                }
+            }
+
+            std::this_thread::sleep_for(milliseconds(10)); // Poll every 10ms
+            poll_count++;
+        }
+
+        if (!focus_complete) {
+            std::ostringstream timeout_msg;
+            timeout_msg << "  [FOCUS] Photo " << i << ": TIMEOUT after " << (poll_count * 10) << "ms"
+                       << " (was_driving=" << (was_driving ? "yes" : "no") << ")\n";
+            log(timeout_msg.str());
+        }
+
+        // GPIO trigger press (focus is already locked via grounded GPIO)
         gpio_trigger_press();
-        log("  " + std::to_string(t2) + "ms: GPIO 12 (Trigger) → LOW (pressed)\n");
         std::this_thread::sleep_for(milliseconds(50));
 
         // GPIO trigger release
-        auto t3 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
         gpio_trigger_release();
-        log("  " + std::to_string(t3) + "ms: GPIO 12 (Trigger) → HIGH (released)\n");
 
-        // Set focus GPIO HIGH (unlock focus)
-        std::this_thread::sleep_for(milliseconds(35));
-        auto t4 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
-        gpio_focus_high();
-        log("  " + std::to_string(t4) + "ms: GPIO 4 (Focus) → HIGH (unlocked)\n");
+        // Wait for camera to complete capture and save to host PC
+        std::this_thread::sleep_for(milliseconds(200));
 
-        // Wait for camera to complete capture and save
-        std::this_thread::sleep_for(milliseconds(240));
-
-        auto photo_end = high_resolution_clock::now();
-        auto cycle_time = duration_cast<milliseconds>(photo_end - photo_start).count();
-        auto elapsed_end = duration_cast<milliseconds>(photo_end - test_start).count();
-        log("  Cycle complete: " + std::to_string(cycle_time) + "ms (Total elapsed: "
-            + std::to_string(elapsed_end) + "ms)\n");
+        // Increment focus position (wrap around if needed)
+        current_focus += focus_step;
+        if (current_focus > focus_max) {
+            current_focus = focus_min;
+        }
     }
 
     auto test_end = high_resolution_clock::now();
@@ -10380,7 +10432,6 @@ void CameraDevice::speed_test_gpio_focus_toggle()
     log(summary.str());
 
     log_file.close();
-    cleanup_gpio_focus();
     cleanup_gpio();
 }
 
