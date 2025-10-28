@@ -10248,9 +10248,16 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
         return;
     }
 
-    // Initialize GPIO for trigger only (focus is physically grounded)
+    // Initialize GPIO for trigger
     if (!init_gpio()) {
         tout << "ERROR: Failed to initialize trigger GPIO. Cannot run speed test.\n";
+        return;
+    }
+
+    // Initialize Focus GPIO
+    if (!init_gpio_focus()) {
+        tout << "ERROR: Failed to initialize Focus GPIO. Cannot run speed test.\n";
+        cleanup_gpio();
         return;
     }
 
@@ -10276,7 +10283,7 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
     log(std::string(80, '=') + "\n");
     log("ILX-LR1 Speed Test - GPIO Trigger with SDK Focus\n");
     log("GPIO Trigger Pin: " + std::to_string(GPIO_TRIGGER_PIN) + "\n");
-    log("Focus GPIO: Physically grounded (always locked)\n");
+    log("GPIO Focus Pin: " + std::to_string(GPIO_FOCUS_PIN) + " (toggled for SDK focus)\n");
 
     auto start_time_t = system_clock::to_time_t(now);
     char start_str[32];
@@ -10343,12 +10350,15 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
     auto test_start = high_resolution_clock::now();
 
-    log("Starting capture sequence (SDK focus + GPIO trigger, focus GPIO grounded)...\n");
+    log("Starting capture sequence (SDK focus + GPIO trigger with focus GPIO control)...\n");
     log("Focus will sweep from MINIMUM (close) to INFINITY (far) over 30 shots\n\n");
 
     for (int i = 1; i <= TOTAL_PHOTOS; i++) {
         int expected_save_count = photos_saved_before + i;
         auto photo_start = high_resolution_clock::now();
+
+        // Set focus GPIO HIGH to unlock focus (allow SDK to change it)
+        gpio_focus_high();
 
         // Set focus position via SDK
         SDK::CrDeviceProperty focusProp;
@@ -10358,9 +10368,8 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
         SDK::SetDeviceProperty(m_device_handle, &focusProp);
 
-        // With focus GPIO grounded, just wait fixed time for focus to complete
-        // Focus driving polling doesn't work reliably when focus is hardware-locked
-        std::this_thread::sleep_for(milliseconds(200));
+        // Wait for focus to complete moving
+        std::this_thread::sleep_for(milliseconds(300));
 
         // Read back actual focus position for first and last photos to verify it's changing
         if (i == 1 || i == TOTAL_PHOTOS) {
@@ -10386,9 +10395,13 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
             }
         }
 
-        // GPIO trigger press (focus is already locked via grounded GPIO)
+        // Set focus GPIO LOW to lock focus (required before shutter trigger)
+        gpio_focus_low();
+        std::this_thread::sleep_for(milliseconds(10));
+
+        // GPIO trigger press
         gpio_trigger_press();
-        std::this_thread::sleep_for(milliseconds(25));
+        std::this_thread::sleep_for(milliseconds(50));
 
         // GPIO trigger release
         gpio_trigger_release();
@@ -10448,6 +10461,7 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
     log(summary.str());
 
     log_file.close();
+    cleanup_gpio_focus();
     cleanup_gpio();
 }
 
