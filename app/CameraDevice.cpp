@@ -10312,7 +10312,7 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
     log("Setting save destination to Host PC only...\n");
     SDK::CrDeviceProperty saveDest;
     saveDest.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_StillImageStoreDestination);
-    saveDest.SetCurrentValue(SDK::CrStillImageStoreDestination::CrStillImageStoreDestination_HostPC);
+    saveDest.SetCurrentValue(SDK::CrStillImageStoreDestination::CrStillImageStoreDestination_MemoryCard);
     saveDest.SetValueType(SDK::CrDataType::CrDataType_UInt16Array);
 
     auto result = SDK::SetDeviceProperty(m_device_handle, &saveDest);
@@ -10362,7 +10362,7 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
         std::this_thread::sleep_for(milliseconds(100));
 
         std::ostringstream focus_msg;
-        focus_msg << "  [FOCUS] Photo " << i << ": Waited 300ms for focus position change (Focus=0x"
+        focus_msg << "  [FOCUS] Photo " << i << ": Waited 100ms for focus position change (Focus=0x"
                   << std::hex << current_focus << std::dec << ")\n";
         log(focus_msg.str());
 
