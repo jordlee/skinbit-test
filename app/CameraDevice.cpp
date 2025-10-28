@@ -10351,61 +10351,14 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
         SDK::SetDeviceProperty(m_device_handle, &focusProp);
 
-        // Poll FocusDrivingStatus immediately - wait for driving to start, then see 2 consecutive NotDriving
-        bool focus_complete = false;
-        int poll_count = 0;
-        const int max_polls = 100; // 100 * 10ms = 1000ms max wait
-        bool was_driving = false;
-        int consecutive_not_driving = 0;
+        // With focus GPIO grounded, just wait fixed time for focus to complete
+        // Focus driving polling doesn't work reliably when focus is hardware-locked
+        std::this_thread::sleep_for(milliseconds(300));
 
-        while (!focus_complete && poll_count < max_polls) {
-            CrInt32u propCode = SDK::CrDevicePropertyCode::CrDeviceProperty_FocusDrivingStatus;
-            CrInt32 numProps = 0;
-            SDK::CrDeviceProperty* properties = nullptr;
-            SDK::CrError err = SDK::GetSelectDeviceProperties(m_device_handle, 1,
-                &propCode, &properties, &numProps);
-
-            if (CR_SUCCEEDED(err) && properties && numProps > 0) {
-                CrInt8u status = properties[0].GetCurrentValue();
-                SDK::ReleaseDeviceProperties(m_device_handle, properties);
-
-                if (status == SDK::CrFocusDrivingStatus::CrFocusDrivingStatus_Driving) {
-                    was_driving = true;
-                    consecutive_not_driving = 0; // Reset counter
-                    std::ostringstream driving_msg;
-                    driving_msg << "  [FOCUS] Photo " << i << ": Driving (poll #" << poll_count + 1 << ")\n";
-                    log(driving_msg.str());
-                } else if (status == SDK::CrFocusDrivingStatus::CrFocusDrivingStatus_NotDriving) {
-                    // Only count NotDriving if we've seen Driving first (avoid false positives)
-                    if (was_driving) {
-                        consecutive_not_driving++;
-                        std::ostringstream notdriving_msg;
-                        notdriving_msg << "  [FOCUS] Photo " << i << ": NotDriving #" << consecutive_not_driving
-                                      << " (poll #" << poll_count + 1 << ")\n";
-                        log(notdriving_msg.str());
-
-                        // Need 2 consecutive NotDriving readings to confirm focus complete
-                        if (consecutive_not_driving >= 2) {
-                            focus_complete = true;
-                            std::ostringstream ready_msg;
-                            ready_msg << "  [FOCUS] Photo " << i << ": Complete (2 consecutive NotDriving)\n";
-                            log(ready_msg.str());
-                            break;
-                        }
-                    }
-                }
-            }
-
-            std::this_thread::sleep_for(milliseconds(10)); // Poll every 10ms
-            poll_count++;
-        }
-
-        if (!focus_complete) {
-            std::ostringstream timeout_msg;
-            timeout_msg << "  [FOCUS] Photo " << i << ": TIMEOUT after " << (poll_count * 10) << "ms"
-                       << " (was_driving=" << (was_driving ? "yes" : "no") << ")\n";
-            log(timeout_msg.str());
-        }
+        std::ostringstream focus_msg;
+        focus_msg << "  [FOCUS] Photo " << i << ": Waited 300ms for focus position change (Focus=0x"
+                  << std::hex << current_focus << std::dec << ")\n";
+        log(focus_msg.str());
 
         // GPIO trigger press (focus is already locked via grounded GPIO)
         gpio_trigger_press();
