@@ -9765,6 +9765,92 @@ void CameraDevice::gpio_trigger_release()
 #endif
 }
 
+bool CameraDevice::init_gpio_focus()
+{
+#if defined(__linux__)
+    if (m_gpio_focus_initialized) {
+        tout << "Focus GPIO already initialized.\n";
+        return true;
+    }
+
+    tout << "Initializing Focus GPIO " << GPIO_CHIP << " pin " << GPIO_FOCUS_PIN << " using libgpiod...\n";
+
+    // Use existing chip if available
+    struct gpiod_chip* chip = static_cast<struct gpiod_chip*>(m_gpio_chip);
+    if (!chip) {
+        tout << "ERROR: GPIO chip not initialized. Call init_gpio() first.\n";
+        return false;
+    }
+
+    // Get GPIO line for focus
+    struct gpiod_line* line = gpiod_chip_get_line(chip, GPIO_FOCUS_PIN);
+    if (!line) {
+        tout << "ERROR: Failed to get GPIO line " << GPIO_FOCUS_PIN << "\n";
+        return false;
+    }
+    m_gpio_focus_line = line;
+
+    // Request line as output, initially HIGH (focus unlocked - can be changed)
+    int ret = gpiod_line_request_output(line, "RemoteCli_Focus", 1);
+    if (ret < 0) {
+        tout << "ERROR: Failed to request focus GPIO line as output\n";
+        m_gpio_focus_line = nullptr;
+        return false;
+    }
+
+    m_gpio_focus_initialized = true;
+    tout << "Focus GPIO pin " << GPIO_FOCUS_PIN << " initialized successfully (started HIGH - unlocked).\n";
+    return true;
+#else
+    tout << "ERROR: GPIO control only supported on Linux.\n";
+    return false;
+#endif
+}
+
+void CameraDevice::cleanup_gpio_focus()
+{
+#if defined(__linux__)
+    if (!m_gpio_focus_initialized) {
+        return;
+    }
+
+    tout << "Cleaning up focus GPIO pin " << GPIO_FOCUS_PIN << "...\n";
+
+    // Set pin to HIGH before cleanup (unlock focus)
+    if (m_gpio_focus_line) {
+        struct gpiod_line* line = static_cast<struct gpiod_line*>(m_gpio_focus_line);
+        gpiod_line_set_value(line, 1);
+        gpiod_line_release(line);
+        m_gpio_focus_line = nullptr;
+    }
+
+    m_gpio_focus_initialized = false;
+    tout << "Focus GPIO cleanup complete.\n";
+#endif
+}
+
+void CameraDevice::gpio_focus_low()
+{
+#if defined(__linux__)
+    // Set GPIO LOW (lock focus - cannot be changed)
+    if (m_gpio_focus_line) {
+        struct gpiod_line* line = static_cast<struct gpiod_line*>(m_gpio_focus_line);
+        gpiod_line_set_value(line, 0);
+    }
+#endif
+}
+
+void CameraDevice::gpio_focus_high()
+{
+#if defined(__linux__)
+    // Set GPIO HIGH (unlock focus - can be changed via SDK)
+    if (m_gpio_focus_line) {
+        struct gpiod_line* line = static_cast<struct gpiod_line*>(m_gpio_focus_line);
+        gpiod_line_set_value(line, 1);
+    }
+#endif
+}
+
 // ============================================================================
 // ILX-LR1 Speed Test with GPIO Hardware Trigger
 // ============================================================================
@@ -9786,6 +9872,13 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
     // Initialize GPIO
     if (!init_gpio()) {
         tout << "ERROR: Failed to initialize GPIO. Cannot run speed test.\n";
+        return;
+    }
+
+    // Initialize Focus GPIO
+    if (!init_gpio_focus()) {
+        tout << "ERROR: Failed to initialize Focus GPIO. Cannot run speed test.\n";
+        cleanup_gpio();
         return;
     }
 
@@ -9823,6 +9916,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
     if (m_prop.focus_position_setting.possible.size() < 3) {
         log("ERROR: Focus Position Setting not supported on this camera.\n");
         log_file.close();
+        cleanup_gpio_focus();
         cleanup_gpio();
         return;
     }
@@ -9872,6 +9966,9 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
     for (int i = 1; i <= TOTAL_PHOTOS; i++) {
         auto photo_start = high_resolution_clock::now();
         auto elapsed_ms = duration_cast<milliseconds>(photo_start - test_start).count();
+
+        // Set focus GPIO HIGH to unlock focus (allow SDK to change it)
+        gpio_focus_high();
 
         // Set focus position
         SDK::CrDeviceProperty focusProp;
@@ -9929,6 +10026,9 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
             log(timeout_msg.str());
         }
 
+        // Set focus GPIO LOW to lock focus (required before shutter trigger)
+        gpio_focus_low();
+
         // auto after_focus_ready = high_resolution_clock::now();
 
         // GPIO trigger press
@@ -9943,7 +10043,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         // std::ostringstream msg2;
         // msg2 << "  " << t2 << "ms: Hold delay (100ms)\n";
         // log(msg2.str());
-        std::this_thread::sleep_for(milliseconds(100));
+        std::this_thread::sleep_for(milliseconds(150));
 
         // GPIO trigger release
         // auto t3 = duration_cast<milliseconds>(high_resolution_clock::now() - test_start).count();
@@ -9980,6 +10080,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
     log(summary.str());
 
     log_file.close();
+    cleanup_gpio_focus();
     cleanup_gpio();
 }
 

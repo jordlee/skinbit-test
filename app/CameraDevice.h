@@ -321,6 +321,10 @@ private:
     void cleanup_gpio();
     void gpio_trigger_press();
     void gpio_trigger_release();
+    bool init_gpio_focus();
+    void cleanup_gpio_focus();
+    void gpio_focus_low();
+    void gpio_focus_high();
 
 private:
     std::int32_t m_number;
@@ -332,11 +336,14 @@ private:
 
     // GPIO configuration for Raspberry Pi hardware trigger
     static constexpr int GPIO_TRIGGER_PIN = 12;  // Physical pin 32, GPIO 12 on gpiochip4
+    static constexpr int GPIO_FOCUS_PIN = 4;     // GPIO 4 on gpiochip4 for focus control
     static constexpr const char* GPIO_CHIP = "gpiochip4";
     bool m_gpio_initialized;
+    bool m_gpio_focus_initialized;
 #if defined(__linux__)
     void* m_gpio_chip;  // struct gpiod_chip* (opaque pointer for non-Linux builds)
     void* m_gpio_line;  // struct gpiod_line* (opaque pointer for non-Linux builds)
+    void* m_gpio_focus_line;  // struct gpiod_line* for focus control
 #endif
     bool m_lvEnbSet;
     SCRSDK::CrSdkControlMode m_modeSDK;
