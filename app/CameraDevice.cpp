@@ -10180,7 +10180,7 @@ void CameraDevice::speed_test_gpio_only()
     log("\n");
 
     gpio_focus_low();
-    
+
     std::this_thread::sleep_for(milliseconds(500));
 
     const int TOTAL_PHOTOS = 30;
@@ -10314,6 +10314,9 @@ void CameraDevice::speed_test_gpio_focus_toggle()
     }
     log("\n");
 
+    log("  Focus HIGH (unlock)\n");
+    gpio_focus_high();
+
     std::this_thread::sleep_for(milliseconds(500));
 
     const int TOTAL_PHOTOS = 30;
@@ -10327,16 +10330,11 @@ void CameraDevice::speed_test_gpio_focus_toggle()
         progress << "Photo " << i << "/" << TOTAL_PHOTOS << "\n";
         log(progress.str());
 
-        // Set focus GPIO HIGH (unlock focus)
-        log("  Focus HIGH (unlock)\n");
-        gpio_focus_high();
-        std::this_thread::sleep_for(milliseconds(50));
-
+        
         // Set focus GPIO LOW (lock focus)
         log("  Focus LOW (lock)\n");
         gpio_focus_low();
-        std::this_thread::sleep_for(milliseconds(10));
-
+        std::this_thread::sleep_for(milliseconds(1));
         // GPIO trigger press
         log("  Trigger LOW (press)\n");
         gpio_trigger_press();
@@ -10345,9 +10343,13 @@ void CameraDevice::speed_test_gpio_focus_toggle()
         // GPIO trigger release
         log("  Trigger HIGH (release)\n");
         gpio_trigger_release();
-
+        // Set focus GPIO HIGH (unlock focus)
+        std::this_thread::sleep_for(milliseconds(1));
+        log("  Focus HIGH (unlock)\n");
+        gpio_focus_high();
+        
         // Wait for camera to complete capture and save
-        std::this_thread::sleep_for(milliseconds(200));
+        std::this_thread::sleep_for(milliseconds(150));
     }
 
     auto test_end = high_resolution_clock::now();
