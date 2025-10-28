@@ -1,0 +1,21 @@
+# Makefile for standalone GPIO trigger test
+
+CXX = g++
+CXXFLAGS = -std=c++17 -Wall -O2
+LDFLAGS = -lgpiod
+
+TARGET = gpio_only_test
+SOURCE = gpio_only_test.cpp
+
+all: $(TARGET)
+
+$(TARGET): $(SOURCE)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SOURCE) $(LDFLAGS)
+
+clean:
+	rm -f $(TARGET)
+
+run: $(TARGET)
+	./$(TARGET)
+
+.PHONY: all clean run
