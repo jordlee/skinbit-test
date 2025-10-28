@@ -9968,8 +9968,8 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         auto elapsed_ms = duration_cast<milliseconds>(photo_start - test_start).count();
 
         // Set focus GPIO HIGH to unlock focus (allow SDK to change it)
-        
-        std::this_thread::sleep_for(milliseconds(10));
+        gpio_focus_high();
+        std::this_thread::sleep_for(milliseconds(50));
 
         // Set focus position
         SDK::CrDeviceProperty focusProp;
@@ -10031,7 +10031,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         gpio_focus_low();
 
         // Small delay to ensure camera registers focus lock before shutter trigger
-        std::this_thread::sleep_for(milliseconds(20));
+        std::this_thread::sleep_for(milliseconds(50));
 
         // auto after_focus_ready = high_resolution_clock::now();
 
@@ -10062,7 +10062,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         // std::ostringstream photo_msg;
         // photo_msg << "  Cycle complete: " << cycle_time << "ms total (Focus=0x" << std::hex << current_focus << std::dec << ")\n";
         // log(photo_msg.str());
-        gpio_focus_high();
+        
         // Increment focus position (wrap around if needed)
         current_focus += focus_step;
         if (current_focus > focus_max) {
