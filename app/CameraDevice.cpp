@@ -10029,6 +10029,9 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         // Set focus GPIO LOW to lock focus (required before shutter trigger)
         gpio_focus_low();
 
+        // Small delay to ensure camera registers focus lock before shutter trigger
+        std::this_thread::sleep_for(milliseconds(10));
+
         // auto after_focus_ready = high_resolution_clock::now();
 
         // GPIO trigger press
