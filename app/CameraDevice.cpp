@@ -9969,6 +9969,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
 
         // Set focus GPIO HIGH to unlock focus (allow SDK to change it)
         gpio_focus_high();
+        std::this_thread::sleep_for(milliseconds(10));
 
         // Set focus position
         SDK::CrDeviceProperty focusProp;
@@ -9982,7 +9983,7 @@ void CameraDevice::speed_test_gpio_hardware_trigger()
         auto focus_set_elapsed = duration_cast<milliseconds>(after_focus_set - photo_start).count();
 
         // Give camera a moment to start driving before polling
-        std::this_thread::sleep_for(milliseconds(50));
+        std::this_thread::sleep_for(milliseconds(100));
 
         // Poll FocusDrivingStatus until NotDriving
         bool focus_complete = false;
