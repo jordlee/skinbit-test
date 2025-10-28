@@ -175,7 +175,7 @@ int main() {
     std::this_thread::sleep_for(milliseconds(500));
 
     const int TOTAL_TRIGGERS = 30;
-    const int PRESS_DURATION_MS = 20;
+    const int PRESS_DURATION_MS = 50;
     const int CYCLE_DELAY_MS = 200;
 
     auto test_start = high_resolution_clock::now();
