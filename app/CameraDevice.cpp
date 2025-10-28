@@ -10360,12 +10360,31 @@ void CameraDevice::speed_test_gpio_with_sdk_focus()
 
         // With focus GPIO grounded, just wait fixed time for focus to complete
         // Focus driving polling doesn't work reliably when focus is hardware-locked
-        std::this_thread::sleep_for(milliseconds(100));
+        std::this_thread::sleep_for(milliseconds(300));
 
-        std::ostringstream focus_msg;
-        focus_msg << "  [FOCUS] Photo " << i << ": Waited 100ms for focus position change (Focus=0x"
-                  << std::hex << current_focus << std::dec << ")\n";
-        log(focus_msg.str());
+        // Read back actual focus position for first and last photos to verify it's changing
+        if (i == 1 || i == TOTAL_PHOTOS) {
+            CrInt32u propCode = SDK::CrDevicePropertyCode::CrDeviceProperty_FocusPositionCurrentValue;
+            CrInt32 numProps = 0;
+            SDK::CrDeviceProperty* properties = nullptr;
+            SDK::CrError err = SDK::GetSelectDeviceProperties(m_device_handle, 1,
+                &propCode, &properties, &numProps);
+
+            if (CR_SUCCEEDED(err) && properties && numProps > 0) {
+                uint16_t actual_focus = properties[0].GetCurrentValue();
+                SDK::ReleaseDeviceProperties(m_device_handle, properties);
+
+                std::ostringstream focus_msg;
+                focus_msg << "  [FOCUS] Photo " << i << ": Set=0x" << std::hex << current_focus
+                          << ", Actual=0x" << actual_focus << std::dec;
+                if (actual_focus == current_focus) {
+                    focus_msg << " ✓ MATCH\n";
+                } else {
+                    focus_msg << " ✗ MISMATCH\n";
+                }
+                log(focus_msg.str());
+            }
+        }
 
         // GPIO trigger press (focus is already locked via grounded GPIO)
         gpio_trigger_press();
