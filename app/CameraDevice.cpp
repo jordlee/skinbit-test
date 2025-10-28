@@ -10084,7 +10084,7 @@ void CameraDevice::speed_test_gpio_only()
 
         // Wait for camera to complete capture and save to SD card
         // Need sufficient time for camera processing + SD card write
-        std::this_thread::sleep_for(milliseconds(300));
+        std::this_thread::sleep_for(milliseconds(200));
 
         // auto after_cycle = high_resolution_clock::now();
         // auto cycle_time = duration_cast<milliseconds>(after_cycle - photo_start).count();
