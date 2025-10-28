@@ -10330,7 +10330,6 @@ void CameraDevice::speed_test_gpio_focus_toggle()
         progress << "Photo " << i << "/" << TOTAL_PHOTOS << "\n";
         log(progress.str());
 
-        
         // Set focus GPIO LOW (lock focus)
         log("  Focus LOW (lock)\n");
         gpio_focus_low();
@@ -10347,9 +10346,9 @@ void CameraDevice::speed_test_gpio_focus_toggle()
         std::this_thread::sleep_for(milliseconds(1));
         log("  Focus HIGH (unlock)\n");
         gpio_focus_high();
-        
+
         // Wait for camera to complete capture and save
-        std::this_thread::sleep_for(milliseconds(150));
+        std::this_thread::sleep_for(milliseconds(250));
     }
 
     auto test_end = high_resolution_clock::now();
