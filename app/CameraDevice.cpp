@@ -10357,7 +10357,7 @@ void CameraDevice::speed_test_gpio_focus_toggle()
         log("  " + std::to_string(t4) + "ms: GPIO 4 (Focus) → HIGH (unlocked)\n");
 
         // Wait for camera to complete capture and save
-        std::this_thread::sleep_for(milliseconds(150));
+        std::this_thread::sleep_for(milliseconds(240));
 
         auto photo_end = high_resolution_clock::now();
         auto cycle_time = duration_cast<milliseconds>(photo_end - photo_start).count();
